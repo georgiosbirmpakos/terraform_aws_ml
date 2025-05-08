@@ -60,6 +60,8 @@ terraform destroy
 
 ---
 
+## 🔄 Flow Diagram
+
 ```mermaid
 graph TD
 
@@ -89,3 +91,6 @@ graph TD
   style G fill:#F1F8E9,stroke:#8BC34A
   style Z fill:#FFEBEE,stroke:#F44336
 ```
+## 🏗️ Architecture Diagram
+
+![Architecture Diagram](diagram.png)

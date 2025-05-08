@@ -135,6 +135,7 @@ dmypy.json
 *.docx
 *.csv
 *.xlsx
+*.png
 
 # macos
 *.DS_Store
