@@ -1,6 +1,6 @@
 ## 🛠️ Project Overview
 
-This project automates the deployment of a simple AWS-based pipeline using **Terraform** and **Python**. It provisions infrastructure, uploads input files to S3, and processes them on an EC2 instance, which renames the files and logs a mapping JSON to an output S3 bucket.
+This project automates the deployment of a simple AWS-based pipeline using **Terraform** and **Python**. It provisions infrastructure, uploads input files to S3, and processes them on an EC2 instance, which renames the files and logs a mapping JSON to an output S3 bucket. A completion marker (`done.json`) ensures that output files are downloaded **only after processing is finished**.
 
 ---
 
@@ -21,6 +21,8 @@ This will:
 3. Upload local input files from the `./input` folder to the input S3 bucket.
 4. Deploy the EC2 instance and IAM roles.
 5. Trigger EC2 to process the files and output results to the output S3 bucket.
+6. 🆕 **Wait for `done.json` to appear**, then automatically download results to a folder on your Desktop.
+7. Terraform engine gets destroyed after the download.
 
 ---
 
@@ -28,11 +30,12 @@ This will:
 
 | File / Folder            | Description |
 |--------------------------|-------------|
-| `main.sh`                | Orchestrates the full deployment and processing workflow. |
+| `main.sh`                | Orchestrates the full deployment, file upload, EC2 deployment, and output download. |
 | `upload_input_to_s3.py`  | Uploads files from local `./input` directory to input S3 bucket. |
 | `process_s3_files.py`    | Script that runs on EC2 to process and rename files. |
 | `terraform/`             | Terraform configuration files (S3, EC2, IAM). |
 | `input/`                 | Contains files to be uploaded and processed. |
+| `output/` (on Desktop)   | Folder where renamed output files and mapping JSON are downloaded. |
 
 ---
 
@@ -55,6 +58,7 @@ terraform destroy
 - Terraform uses the AWS credentials configured in your environment.
 - No secrets or access keys are hardcoded in the scripts.
 
+---
 
 ```mermaid
 graph TD
@@ -63,7 +67,6 @@ graph TD
   A -->|Uploads files| C[S3 Input Bucket]
 
   B -->|Creates| C[S3 Input Bucket]
-  B -->|Creates| D[S3 Output Bucket]
   B -->|Creates| E[EC2 Instance]
   B -->|Creates| F[IAM Role for EC2]
 
@@ -72,6 +75,10 @@ graph TD
   E -->|Processes files| G[Python: process_s3_files.py]
   G -->|Renames and uploads| D
   G -->|Uploads mapping JSON| D
+  G -->|Uploads done.json ✅| D
+  A -->|Waits for done.json, then syncs output| D
+  A -->|Runs destroy| Z[🧹 Terraform Destroy Infrastructure]
+
 
   style A fill:#E3F2FD,stroke:#2196F3
   style B fill:#FFF3E0,stroke:#FF9800
@@ -80,4 +87,5 @@ graph TD
   style C fill:#FCE4EC,stroke:#E91E63
   style D fill:#E1F5FE,stroke:#03A9F4
   style G fill:#F1F8E9,stroke:#8BC34A
+  style Z fill:#FFEBEE,stroke:#F44336
 ```
