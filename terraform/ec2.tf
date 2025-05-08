@@ -76,6 +76,9 @@ user_data = <<-EOF
               # Run script in venv
               source venv/bin/activate
               python3 process_s3_files.py
+              
+              echo '{"status": "done", "timestamp": "'$(date)'"}' > done.json
+              aws s3 cp done.json s3://georgios-output-bucket-euw2-0705-unique1/done.json --region eu-west-2
               EOF
 
   tags = {
