@@ -54,9 +54,15 @@ terraform destroy
 
 ## 🛡️ Security & Authentication
 
-- EC2 uses an **IAM Role** with limited permissions to interact with S3.
-- Terraform uses the AWS credentials configured in your environment.
-- No secrets or access keys are hardcoded in the scripts.
+- EC2 uses an **IAM Role (`ec2_s3_access_role`)** with strict permissions to interact only with the specified S3 input and output buckets.
+- S3 buckets are protected by an **S3 Bucket Policy**:
+  - **Access is restricted exclusively** to:
+    - The EC2 instance IAM Role
+    - A single developer IAM user (`terraform`) for local uploads
+  - All other access (including public access) is denied.
+- Terraform uses the AWS credentials configured in your environment (via environment variables, `~/.aws/credentials`, or IAM roles).
+- No secrets or access keys are hardcoded in any scripts or infrastructure code.
+- **AWS Block Public Access** is enabled for all buckets to prevent unintended exposure.
 
 ---
 

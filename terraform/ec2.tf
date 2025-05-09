@@ -8,6 +8,9 @@ resource "aws_instance" "ec2" {
   associate_public_ip_address = true
   monitoring = true
 
+  depends_on = [aws_iam_instance_profile.ec2_profile]
+
+
   user_data = file("${path.module}/ec2_user_data.sh")
 
   tags = {

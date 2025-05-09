@@ -11,7 +11,13 @@ echo "🌱 Initializing Terraform..."
 terraform init -input=false
 
 echo "🚧 Step 1: Create only the S3 buckets..."
-terraform apply -target=aws_s3_bucket.input_bucket -target=aws_s3_bucket.output_bucket -auto-approve
+terraform apply \
+  -target=aws_s3_bucket.input_bucket \
+  -target=aws_s3_bucket.output_bucket \
+  -target=aws_iam_role.ec2_s3_role \
+  -target=aws_iam_role_policy.ec2_s3_policy \
+  -target=aws_iam_instance_profile.ec2_profile \
+  -auto-approve
 
 echo "🧹 Step 2: Empty existing contents in S3 buckets..."
 aws s3 rm s3://$INPUT_BUCKET --recursive || true
