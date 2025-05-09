@@ -84,7 +84,7 @@ graph TD
   G -->|Renames and uploads| D
   G -->|Uploads mapping JSON| D
   G -->|Uploads done.json ✅| D
-  A -->|Waits for done.json, then syncs output| D
+  A -->|Creates / Waits for done.json, then syncs output| D[S3 Output Bucket]
   A -->|Runs destroy| Z[🧹 Terraform Destroy Infrastructure]
 
 
@@ -97,6 +97,11 @@ graph TD
   style G fill:#F1F8E9,stroke:#8BC34A
   style Z fill:#FFEBEE,stroke:#F44336
 ```
+
+---
+
 ## 🏗️ Architecture Diagram
 
 ![Architecture Diagram](diagram.png)
+
+---
