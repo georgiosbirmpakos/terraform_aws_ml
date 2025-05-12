@@ -1,66 +1,50 @@
 #!/bin/bash
+set -e
+
+# Update and install dependencies
 sudo apt update -y
 sudo apt install -y python3-pip unzip curl python3-venv
 
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
-export PATH=$PATH:/usr/local/bin
-
+# Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate
+
+# Upgrade pip and install boto3 inside venv
+pip install --upgrade pip
 pip install boto3
 
-echo "⏳ Waiting for input files to appear in S3..."
-while true; do
-  count=$(aws s3 ls s3://georgios-input-bucket-euw2-0705-unique1/ | wc -l)
-  if [ "$count" -gt 0 ]; then
-    echo "✅ Files found in input bucket."
-    break
-  else
-    echo "⏳ Still waiting..."
-    sleep 5
-  fi
-done
-
-cat > process_s3_files.py <<EOPYTHON
-import boto3
-import os
-import json
+cat > process_zip.py <<EOF
+import boto3, os, zipfile
 
 input_bucket = "georgios-input-bucket-euw2-0705-unique1"
 output_bucket = "georgios-output-bucket-euw2-0705-unique1"
 region = "eu-west-2"
 
-s3 = boto3.client('s3', region_name=region)
-objects = s3.list_objects_v2(Bucket=input_bucket).get("Contents", [])
+# Create working dirs
+os.makedirs("extracted", exist_ok=True)
 
-file_mappings = []
+s3 = boto3.client("s3", region_name=region)
+s3.download_file(input_bucket, "input_images.zip", "input_images.zip")
 
-for idx, obj in enumerate(objects, start=1):
-    old_key = obj["Key"]
-    ext = os.path.splitext(old_key)[1]
-    new_key = f"animal_{idx}{ext}"
+# Extract images
+with zipfile.ZipFile("input_images.zip", "r") as zip_ref:
+    zip_ref.extractall("extracted")
 
-    s3.download_file(input_bucket, old_key, old_key)
-    s3.upload_file(old_key, output_bucket, new_key)
+# Rename and repackage
+processed = []
+for idx, fname in enumerate(os.listdir("extracted"), start=1):
+    ext = os.path.splitext(fname)[1]
+    new_name = f"animal_{idx}{ext}"
+    os.rename(f"extracted/{fname}", new_name)
+    processed.append(new_name)
 
-    file_mappings.append({
-        "previous_name": old_key,
-        "current_name": new_key
-    })
+with zipfile.ZipFile("output_images.zip", "w") as zipf:
+    for f in processed:
+        zipf.write(f)
 
-json_file = "file_mappings.json"
-with open(json_file, "w") as f:
-    json.dump(file_mappings, f, indent=4)
+# Upload output ZIP to S3
+s3.upload_file("output_images.zip", output_bucket, "output_images.zip")
+EOF
 
-s3.upload_file(json_file, output_bucket, json_file)
-
-print("✅ S3 processing complete.")
-EOPYTHON
-
-source venv/bin/activate
-python3 process_s3_files.py
-
-echo '{"status": "done", "timestamp": "'$(date)'"}' > done.json
-aws s3 cp done.json s3://georgios-output-bucket-euw2-0705-unique1/done.json --region eu-west-2
+# Run Python script
+python process_zip.py

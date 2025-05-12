@@ -1,16 +1,16 @@
 #!/bin/bash
 set -e
 
-# === CONFIG ===
 INPUT_BUCKET="georgios-input-bucket-euw2-0705-unique1"
 OUTPUT_BUCKET="georgios-output-bucket-euw2-0705-unique1"
+REGION="eu-west-2"
+ZIP_NAME="input_images.zip"
+OUTPUT_ZIP="output_images.zip"
+PROJECT_ROOT="$(pwd)"
 
-cd terraform || { echo "❌ terraform folder not found"; exit 1; }
-
-echo "🌱 Initializing Terraform..."
+# Step 0: Init and create only buckets + IAM
+cd terraform
 terraform init -input=false
-
-echo "🚧 Step 1: Create only the S3 buckets..."
 terraform apply \
   -target=aws_s3_bucket.input_bucket \
   -target=aws_s3_bucket.output_bucket \
@@ -18,34 +18,32 @@ terraform apply \
   -target=aws_iam_role_policy.ec2_s3_policy \
   -target=aws_iam_instance_profile.ec2_profile \
   -auto-approve
+cd ..
 
-echo "🧹 Step 2: Empty existing contents in S3 buckets..."
-aws s3 rm s3://$INPUT_BUCKET --recursive || true
-aws s3 rm s3://$OUTPUT_BUCKET --recursive || true
-
-echo "☁️ Step 3: Upload input files to input bucket..."
-cd .. || exit 1
+# Step 1: ZIP and upload input files using Python
 python upload_input_to_s3.py
 
-echo "🚀 Step 4: Deploy IAM, EC2, and remaining infrastructure..."
-cd terraform || exit 1
+# Step 2: Upload ZIP to input bucket
+aws s3 cp $ZIP_NAME s3://$INPUT_BUCKET/ --region $REGION
+
+# Step 3: Deploy the rest (EC2, VPC, endpoint, etc.)
+cd terraform
 terraform apply -auto-approve
+cd ..
 
-echo "✅ Done! EC2 will process files and upload renamed versions with JSON mapping."
-# ⏳ Step 5: Wait for EC2 to finish processing (optional, see note below)
-
-echo "⏳ Waiting for EC2 to finish (watching for done.json in S3)..."
-until aws s3 ls s3://$OUTPUT_BUCKET/done.json --region eu-west-2 > /dev/null 2>&1; do
-    echo "🔄 Still waiting..."
+# Step 4: Wait for EC2 output
+until aws s3 ls s3://$OUTPUT_BUCKET/$OUTPUT_ZIP --region $REGION > /dev/null 2>&1; do
+    echo "⏳ Waiting for EC2 to finish..."
     sleep 10
 done
-echo "✅ EC2 has finished processing!"
 
-# 📥 Step 6: Download results to Desktop
-LOCAL_OUTPUT_DIR="$HOME/Desktop/output"
-mkdir -p "$LOCAL_OUTPUT_DIR"
-aws s3 sync s3://$OUTPUT_BUCKET "$LOCAL_OUTPUT_DIR" --region eu-west-2
+# Step 5: Download output
+mkdir -p ~/Desktop/output
+aws s3 cp s3://$OUTPUT_BUCKET/$OUTPUT_ZIP ~/Desktop/output/$OUTPUT_ZIP --region $REGION
+cd ~/Desktop/output && unzip -o $OUTPUT_ZIP
 
-echo "📁 Output files downloaded to: $LOCAL_OUTPUT_DIR"
-
+# Step 6: Clean up
+cd "$PROJECT_ROOT/terraform"
 terraform destroy -auto-approve
+
+echo "✅ Done!"
